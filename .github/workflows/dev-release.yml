@@ -1,4 +1,4 @@
-name: Windows Development Release
+name: Linux Development Release
 
 on:
   push:
@@ -19,93 +19,48 @@ on:
 
 jobs:
   build:
-    runs-on: windows-2019
-
+    runs-on: ubuntu-latest
     steps:
-    #git checkout
+    
     - uses: actions/checkout@v4
 
-    - name: windows dependencies
-      #Sets versions for ACE/TBB
-      env:
-        ACE_VERSION: 6.5.11
-        ACE_VERSION2: 6_5_11
-        TBB_VERSION: 2020.3
-
+    - name: Build
       run: |
-        #directory variables
-        export ACE_ROOT=$GITHUB_WORKSPACE/ACE_wrappers
-        export TBB_ROOT_DIR=$GITHUB_WORKSPACE/tbb
-        #ACE package download
-        curl -LOJ http://github.com/DOCGroup/ACE_TAO/releases/download/ACE%2BTAO-$ACE_VERSION2/ACE-$ACE_VERSION.zip
-        unzip ACE-$ACE_VERSION.zip
-        rm ACE-$ACE_VERSION.zip
-        #configuration of ACE header
-        echo "#include \"ace/config-win32.h\"" >> $ACE_ROOT/ace/config.h
-        #TBB package download
-        curl -LOJ https://github.com/oneapi-src/oneTBB/releases/download/v$TBB_VERSION/tbb-$TBB_VERSION-win.zip
-        unzip tbb-$TBB_VERSION-win.zip
-        rm tbb-$TBB_VERSION-win.zip
-      #git bash shell
-      shell: bash
-
-    #build and install
-    - name: windows build & install
-      run: |
-        #directory variables
-        export ACE_ROOT=$GITHUB_WORKSPACE/ACE_wrappers
-        cd $GITHUB_WORKSPACE/ACE_wrappers
-        /c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe "ACE_wrappers_vs2019.sln" //p:Configuration=Release //p:Platform=x64 //t:ACE //m:2
-        cd $GITHUB_WORKSPACE
+        sudo apt-get -qq update
+        sudo apt-get -qq install build-essential cmake libace-dev libmysql++-dev libtbb-dev libcurl4-openssl-dev openssl
         mkdir build
+        mkdir _install
         cd build
-        cmake -D TBB_ROOT_DIR=$GITHUB_WORKSPACE/tbb -DWITH_WARNINGS=0 -DBUILD_FOR_HOST_CPU=0 -DUSE_EXTRACTORS=1 -G "Visual Studio 16 2019" -A x64 ..
-        /c/Program\ Files\ \(x86\)/Microsoft\ Visual\ Studio/2019/Enterprise/MSBuild/Current/Bin/MSBuild.exe "MaNGOS.sln" //p:Platform=x64 //p:Configuration=Release //m:2
-      #git bash shell
-      shell: bash
-    - name: Create Upload File Name
+        sudo cmake ../ -DCMAKE_INSTALL_PREFIX=/azeroth -DWITH_WARNINGS=0 -DUSE_EXTRACTORS=0 -DENABLE_MAILSENDER=0 -DDEBUG=0 -DSUPPORTED_CLIENT_BUILD=5875
+        sudo make -j $(nproc)
+        sudo make install
+        
+    - name: Collect Files
       run: |
-          echo "ARCHIVE_FILENAME=${{ github.event.repository.name }}-$(git rev-parse --short HEAD).zip" >> $env:GITHUB_ENV
-    - name: Archive files
-      run: |
-          #data is in Release folder
-          cd ${{github.workspace}}/bin
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbb.dll ${{github.workspace}}/bin/Release/tbb.dll
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbb_debug.dll ${{github.workspace}}/bin/Release/tbb_debug.dll
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbb_preview.dll ${{github.workspace}}/bin/Release/tbb_preview.dll
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbb_preview_debug.dll ${{github.workspace}}/bin/Release/tbb_preview_debug.dll
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbbmalloc.dll ${{github.workspace}}/bin/Release/tbbmalloc.dll
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbbmalloc_debug.dll ${{github.workspace}}/bin/Release/tbbmalloc_debug.dll
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbbmalloc_proxy.dll ${{github.workspace}}/bin/Release/tbbmalloc_proxy.dll
-          copy ${{github.workspace}}/tbb/bin/intel64/vc14/tbbmalloc_proxy_debug.dll ${{github.workspace}}/bin/Release/tbbmalloc_proxy_debug.dll
-
-          copy ${{github.workspace}}/ACE_wrappers/lib/ACE.dll ${{github.workspace}}/bin/Release/ACE.dll
-          copy ${{github.workspace}}/dep/windows/lib/x64_release/libmySQL.dll ${{github.workspace}}/bin/Release/libmySQL.dll
-          # copy "c:/Program Files/OpenSSL-Win64/bin/libssl-1_1-x64.dll" ${{github.workspace}}/bin/Release/libssl-1_1-x64.dll
-          # copy "c:/Program Files/OpenSSL-Win64/bin/libcrypto-1_1-x64.dll" ${{github.workspace}}/bin/Release/libcrypto-1_1-x64.dll
-          copy ${{github.workspace}}/dep/windows/lib/x64_release/libeay32.dll ${{github.workspace}}/bin/Release/libeay32.dll
-
-          7z a -tzip ${{env.ARCHIVE_FILENAME}} Release
-    - name: Archive this artefact
-      uses: actions/upload-artifact@v4
+        sudo mv /azeroth/etc/realmd.conf.dist /azeroth/etc/realmd.conf
+        sudo mv /azeroth/etc/mangosd.conf.dist /azeroth/etc/mangosd.conf
+    - uses: actions/upload-artifact@v4
       with:
-          name: snapshot-devbuild
-          path: "${{github.workspace}}/bin/${{env.ARCHIVE_FILENAME}}"
-
-    - name: Download artifact snapshot-Release
+        name: my-artifact
+        path: |
+          /azeroth/bin/realmd
+          /azeroth/etc/realmd.conf
+          /azeroth/bin/mangosd
+          /azeroth/etc/mangosd.conf
+        
+    - name: Download Artifact
       uses: actions/download-artifact@v4
       with:
-        pattern: snapshot-devbuild
-        merge-multiple: true
+        pattern: my-artifact
         path: all_snapshots
 
-    - name: Get current date
+    - name: Get Date
       id: date
       uses: Kaven-Universe/github-action-current-date-time@v1
       with:
         format: "YYYY-MM-DD"
 
-    - name: Upload snapshot
+    - name: Upload Snapshot
       uses: "crowbarmaster/GH-Automatic-Releases@latest"
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
