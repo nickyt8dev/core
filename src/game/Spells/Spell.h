@@ -473,7 +473,7 @@ class Spell
 
         void AddChanneledAuraHolder(SpellAuraHolder* holder);
         void RemoveChanneledAuraHolder(SpellAuraHolder* holder, AuraRemoveMode mode);
-
+        void UpdateCastStartPosition();
         void Delete() const;
 
         bool HasModifierApplied(SpellModifier* mod);
@@ -498,7 +498,6 @@ class Spell
         void SendLoot(ObjectGuid guid, LootType loottype, LockType lockType);
         bool IgnoreItemRequirements() const;                // some item use spells have unexpected reagent data
         void UpdateOriginalCasterPointer();
-        void UpdateCastStartPosition();
 
         ObjectGuid m_originalCasterGUID;                    // real source of cast (aura caster/etc), used for spell targets selection
                                                             // e.g. damage around area spell trigered by victim aura and damage enemies of aura caster
@@ -506,8 +505,10 @@ class Spell
 
         Spell** m_selfContainer = nullptr;                  // pointer to our spell container (if applicable)
 
-        //Spell data
+        // Spell data
+    public:
         WeaponAttackType m_attackType;                      // For weapon based attack
+    protected:
         uint32 m_powerCost = 0;                             // Calculated spell cost     initialized only in Spell::prepare
         int32 m_casttime = 0;                               // Calculated spell cast time initialized only in Spell::prepare
         int32 m_duration = 0;

@@ -27,6 +27,11 @@ EndScriptData */
 #define NPC_FLAMEWAKER_HEALER    11663
 #define NPC_FLAMEWAKER_ELITE     11664
 
+enum
+{
+    SAY_DOMO    = 7566
+};
+
 struct sSpawnLocation
 {
     uint32 m_uiEntry;
@@ -46,7 +51,7 @@ struct instance_molten_core : ScriptedInstance
     uint32 m_auiEncounter[INSTANCE_MC_MAX_ENCOUNTER];
 
     uint64 m_uiLucifronGUID, m_uiMagmadarGUID, m_uiGehennasGUID, m_uiGarrGUID, m_uiGeddonGUID, m_uiShazzrahGUID, m_uiSulfuronGUID, m_uiGolemaggGUID, m_uiMajorDomoGUID, m_uiRagnarosGUID, m_uiFlamewakerPriestGUID;
-    uint64 m_uiRuneKoroGUID, m_uiRuneZethGUID, m_uiRuneMazjGUID, m_uiRuneTheriGUID, m_uiRuneBlazGUID, m_uiRuneKressGUID, m_uiRuneMohnGUID, m_uiFirelordCacheGUID;
+    uint64 m_uiRuneKoroGUID, m_uiRuneZethGUID, m_uiRuneMazjGUID, m_uiRuneTheriGUID, m_uiRuneBlazGUID, m_uiRuneKressGUID, m_uiRuneMohnGUID, m_uiHotCoalsGUID, m_uiFirelordCacheGUID;
     uint64 RuneActive[7];
     uint32 DomoSpawn;
     uint32 RemoveTimer;
@@ -77,6 +82,7 @@ struct instance_molten_core : ScriptedInstance
         m_uiRuneKressGUID = 0;
         m_uiRuneMohnGUID = 0;
 
+        m_uiHotCoalsGUID = 0;
         m_uiFirelordCacheGUID = 0;
 
         RemoveTimer = 5000;
@@ -137,6 +143,10 @@ struct instance_molten_core : ScriptedInstance
                 m_uiRuneMohnGUID = pGo->GetGUID();
                 if (RuneActive[6] == DONE)
                     GOUseGuidList[6] = pGo->GetGUID();
+                break;
+            case 177000:
+                m_uiHotCoalsGUID = pGo->GetGUID();
+                pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_IN_USE);
                 break;
             case 179703:
                 m_uiFirelordCacheGUID = pGo->GetGUID(); //majordomo event chest
@@ -660,7 +670,7 @@ bool GOHello_go_rune_MC(Player* pPlayer, GameObject* pGo)
         {
             pInstance->SetData(TypeDomoSpawn, DONE);
             if (Creature* Domo = pPlayer->SummonCreature(NPC_DOMO, 758.089f, -1176.71f, -118.640f, 3.12414f, TEMPSUMMON_MANUAL_DESPAWN, 2 * HOUR * IN_MILLISECONDS))
-                DoScriptText(-1409004, Domo);
+                DoScriptText(SAY_DOMO, Domo);
         }
     }
 
