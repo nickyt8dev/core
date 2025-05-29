@@ -2614,7 +2614,7 @@ void Player::SetGMChat(bool on, bool notify)
         m_ExtraFlags |= PLAYER_EXTRA_GM_CHAT;
         if (notify)
         {
-            ChatHandler(this).SendSysMessage(LANG_GM_CHAT_ON);
+            SendSysMessage(LANG_GM_CHAT_ON);
             GetSession()->SendNotification(LANG_GM_CHAT_ON);
         }
     }
@@ -2623,7 +2623,7 @@ void Player::SetGMChat(bool on, bool notify)
         m_ExtraFlags &= ~PLAYER_EXTRA_GM_CHAT;
         if (notify)
         {
-            ChatHandler(this).SendSysMessage(LANG_GM_CHAT_OFF);
+            SendSysMessage(LANG_GM_CHAT_OFF);
             GetSession()->SendNotification(LANG_GM_CHAT_OFF);
         }
     }
@@ -2649,7 +2649,7 @@ void Player::SetGameMaster(bool on, bool notify)
 
         if (notify)
         {
-            ChatHandler(this).SendSysMessage(LANG_GM_ON);
+            SendSysMessage(LANG_GM_ON);
             GetSession()->SendNotification(LANG_GM_ON);
         }
     }
@@ -2674,7 +2674,7 @@ void Player::SetGameMaster(bool on, bool notify)
 
         if (notify)
         {
-            ChatHandler(this).SendSysMessage(LANG_GM_OFF);
+            SendSysMessage(LANG_GM_OFF);
             GetSession()->SendNotification(LANG_GM_OFF);
         }
     }
@@ -2712,7 +2712,7 @@ void Player::SetGMVisible(bool on, bool notify)
 
         if (notify)
         {
-            ChatHandler(this).SendSysMessage(LANG_INVISIBLE_VISIBLE);
+            SendSysMessage(LANG_INVISIBLE_VISIBLE);
             GetSession()->SendNotification(LANG_INVIS_OFF);
         }
     }
@@ -2730,7 +2730,7 @@ void Player::SetGMVisible(bool on, bool notify)
 
         if (notify)
         {
-            ChatHandler(this).PSendSysMessage(LANG_INVISIBLE_INVISIBLE, GetGMInvisibilityLevel());
+            PSendSysMessage(LANG_INVISIBLE_INVISIBLE, GetGMInvisibilityLevel());
             GetSession()->SendNotification(LANG_INVIS_ON);
         }
     }
@@ -2764,6 +2764,19 @@ void Player::SetCheatFixedZ(bool on, bool notify)
     if (notify)
     {
         GetSession()->SendNotification(on ? LANG_CHEAT_FIXED_Z_ON : LANG_CHEAT_FIXED_Z_OFF);
+    }
+}
+
+void Player::SetCheatBeastmaster(bool on, bool notify)
+{
+    if (on)
+        SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_1);
+    else
+        RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_1);
+
+    if (notify)
+    {
+        GetSession()->SendNotification(on ? LANG_CHEAT_BEASTMASTER_ON : LANG_CHEAT_BEASTMASTER_OFF);
     }
 }
 
@@ -3380,12 +3393,11 @@ void Player::InitStatsForLevel(bool reapplyMods)
 
     // cleanup unit flags (will be re-applied if need at aura load).
     RemoveFlag(UNIT_FIELD_FLAGS,
-               UNIT_FLAG_SPAWNING         | UNIT_FLAG_REMOVE_CLIENT_CONTROL  | UNIT_FLAG_NOT_ATTACKABLE_1 |
-               UNIT_FLAG_IMMUNE_TO_PLAYER | UNIT_FLAG_IMMUNE_TO_NPC          | UNIT_FLAG_LOOTING          |
+               UNIT_FLAG_SPAWNING         | UNIT_FLAG_REMOVE_CLIENT_CONTROL  | UNIT_FLAG_LOOTING          |
                UNIT_FLAG_PET_IN_COMBAT    | UNIT_FLAG_SILENCED               | UNIT_FLAG_PACIFIED         |
                UNIT_FLAG_STUNNED          | UNIT_FLAG_IN_COMBAT              | UNIT_FLAG_DISARMED         |
-               UNIT_FLAG_CONFUSED         | UNIT_FLAG_FLEEING                | UNIT_FLAG_NOT_SELECTABLE   |
-               UNIT_FLAG_SKINNABLE        | UNIT_FLAG_IMMUNE                 | UNIT_FLAG_AURAS_VISIBLE    | UNIT_FLAG_TAXI_FLIGHT);
+               UNIT_FLAG_CONFUSED         | UNIT_FLAG_FLEEING                | UNIT_FLAG_TAXI_FLIGHT      |
+               UNIT_FLAG_SKINNABLE        | UNIT_FLAG_IMMUNE                 | UNIT_FLAG_AURAS_VISIBLE);
     SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED);    // must be set
 
     // cleanup player flags (will be re-applied if need at aura load), to avoid have ghost flag without ghost aura, for example.
@@ -7445,7 +7457,7 @@ void Player::CastItemUseSpell(Item* item, SpellCastTargets const& targets)
 
         RemoveAurasWithInterruptFlags(AURA_INTERRUPT_ITEM_USE_CANCELS, 0, false, spellInfo->HasAttribute(SPELL_ATTR_EX_ALLOW_WHILE_STEALTHED));
 
-        Spell* spell = new Spell(this, spellInfo, ((count > 0) || proto->HasExtraFlag(ITEM_EXTRA_CAST_AS_TRIGGERED)));
+        Spell* spell = new Spell(this, spellInfo, (count > 0));
         spell->SetCastItem(item);
         spell->prepare(targets);
 
@@ -12701,7 +12713,12 @@ bool Player::CanRewardQuest(Quest const* pQuest, bool msg) const
     if (pQuest->IsAutoComplete())
     {
         if (!CanTakeQuest(pQuest, false, true))
-            return false;
+        {
+            if (IsGameMaster())
+                PSendSysMessage("Bypassing turn in check for auto completed quest %u due to GM mode.", pQuest->GetQuestId());
+            else
+                return false;
+        }
     }
     else
     {
@@ -13143,7 +13160,7 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, WorldObject* questE
     q_status.m_reward_choice = pQuest->RewChoiceItemId[reward];
 
     // Used for client inform but rewarded only in case not max level
-    uint32 xp = uint32(pQuest->XPValue(this) * sWorld.getConfig(CONFIG_FLOAT_RATE_XP_QUEST));
+    uint32 xp = uint32(pQuest->XPValue(GetLevel()) * sWorld.getConfig(CONFIG_FLOAT_RATE_XP_QUEST));
 
     if (GetLevel() < sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL))
         GiveXP(xp , nullptr);
@@ -14676,6 +14693,8 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
 
     if (m_characterFlags & CHARACTER_FLAG_RESTING)
         SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING);
+    if (m_characterFlags & CHARACTER_FLAG_BEASTMASTER)
+        SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_1);
     if (m_characterFlags & CHARACTER_FLAG_PVP_ENABLED)
         UpdatePvP(true);
     if (m_characterFlags & CHARACTER_FLAG_PVP_DESIRED)
@@ -16342,9 +16361,9 @@ bool Player::SaveNewPlayer(WorldSession* session, uint32 guidlow, std::string co
 
 void Player::UpdateCharacterFlags()
 {
-    SetCharacterFlag(CHARACTER_FLAG_INVIS_GOD, GetInvincibilityHpThreshold());
     SetCharacterFlag(CHARACTER_FLAG_RESTING, HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING));
     SetCharacterFlag(CHARACTER_FLAG_SILENCED, !CanSpeak());
+    SetCharacterFlag(CHARACTER_FLAG_BEASTMASTER, HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_ATTACKABLE_1));
     SetCharacterFlag(CHARACTER_FLAG_PVP_ENABLED, IsPvP());
     SetCharacterFlag(CHARACTER_FLAG_HAS_PVP_RANK, GetByteValue(PLAYER_FIELD_BYTES, PLAYER_FIELD_BYTES_OFFSET_HIGHEST_HONOR_RANK));
     SetCharacterFlag(CHARACTER_FLAG_HIDE_HELM, HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_HELM));
@@ -16426,7 +16445,7 @@ void Player::SaveToDB(bool online, bool force)
         uberInsert.addFloat(finiteAlways(GetPositionX()));
         uberInsert.addFloat(finiteAlways(GetPositionY()));
         uberInsert.addFloat(finiteAlways(GetPositionZ()));
-        uberInsert.addFloat(MapManager::NormalizeOrientation(finiteAlways(GetOrientation())));
+        uberInsert.addFloat(Geometry::NormalizeOrientation(finiteAlways(GetOrientation())));
     }
     else
     {
@@ -16435,7 +16454,7 @@ void Player::SaveToDB(bool online, bool force)
         uberInsert.addFloat(finiteAlways(GetTeleportDest().x));
         uberInsert.addFloat(finiteAlways(GetTeleportDest().y));
         uberInsert.addFloat(finiteAlways(GetTeleportDest().z));
-        uberInsert.addFloat(MapManager::NormalizeOrientation(finiteAlways(GetTeleportDest().o)));
+        uberInsert.addFloat(Geometry::NormalizeOrientation(finiteAlways(GetTeleportDest().o)));
     }
 
     if (m_transport)
@@ -16445,7 +16464,7 @@ void Player::SaveToDB(bool online, bool force)
     uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos().x));
     uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos().y));
     uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos().z));
-    uberInsert.addFloat(MapManager::NormalizeOrientation(finiteAlways(m_movementInfo.GetTransportPos().o)));
+    uberInsert.addFloat(Geometry::NormalizeOrientation(finiteAlways(m_movementInfo.GetTransportPos().o)));
 
     std::ostringstream ss;
     ss << m_taxi;                                   // string with TaxiMaskSize numbers
@@ -17116,7 +17135,7 @@ void Player::SendFactionAtWar(uint32 reputationId, bool apply) const
 
 void Player::SendResetFailedNotify()
 {
-    ChatHandler(this).SendSysMessage(LANG_LEAVE_TO_RESET_INSTANCE);
+    SendSysMessage(LANG_LEAVE_TO_RESET_INSTANCE);
 }
 
 // Reset all solo instances and optionally send a message on success for each
@@ -17356,6 +17375,39 @@ void Player::TextEmote(char const* text) const
     WorldPacket data;
     ChatHandler::BuildChatPacket(data, CHAT_MSG_EMOTE, text, LANG_UNIVERSAL, GetChatTag(), GetObjectGuid(), GetName());
     SendMessageToSetInRange(&data, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_TEXTEMOTE), true, !sWorld.getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_CHAT));
+}
+
+void Player::SendSysMessage(int32 entry) const
+{
+    SendSysMessage(m_session->GetMangosString(entry));
+}
+
+void Player::SendSysMessage(char const* str) const
+{
+    WorldPacket data;
+    ChatHandler::BuildChatPacket(data, CHAT_MSG_SYSTEM, str);
+    m_session->SendPacket(&data);
+}
+
+void Player::PSendSysMessage(int32 entry, ...) const
+{
+    char const* format = m_session->GetMangosString(entry);
+    va_list ap;
+    char str[2048];
+    va_start(ap, entry);
+    vsnprintf(str, 2048, format, ap);
+    va_end(ap);
+    SendSysMessage(str);
+}
+
+void Player::PSendSysMessage(char const* format, ...) const
+{
+    va_list ap;
+    char str[2048];
+    va_start(ap, format);
+    vsnprintf(str, 2048, format, ap);
+    va_end(ap);
+    SendSysMessage(str);
 }
 
 void Player::PetSpellInitialize()
@@ -21624,7 +21676,7 @@ Item* Player::AddItem(uint32 itemId, uint32 count)
     if (count == 0 || dest.empty())
     {
         // -- TODO: Send to mailbox if no space
-        ChatHandler(this).PSendSysMessage("You don't have any space in your bags.");
+        PSendSysMessage("You don't have any space in your bags.");
         return nullptr;
     }
 

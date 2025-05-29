@@ -29,6 +29,7 @@
 #include "MapReference.h"
 #include "WorldSession.h"
 #include "Pet.h"
+#include "Item.h"
 #include "Util.h"                                           // for Tokens typedef
 #include "ReputationMgr.h"
 #include "BattleGroundDefines.h"
@@ -797,6 +798,7 @@ class Player final: public Unit
         
         void SetCheatFly(bool on, bool notify = false);
         void SetCheatFixedZ(bool on, bool notify = false);
+        void SetCheatBeastmaster(bool on, bool notify = false);
         void SetCheatGod(bool on, bool notify = false);
         void SetCheatNoCooldown(bool on, bool notify = false);
         void SetCheatInstantCast(bool on, bool notify = false);
@@ -2120,6 +2122,10 @@ class Player final: public Unit
         void Say(char const* text, uint32 const language) const;
         void Yell(char const* text, uint32 const language) const;
         void TextEmote(char const* text) const;
+        void SendSysMessage(int32 entry) const;
+        void SendSysMessage(char const* str) const;
+        void PSendSysMessage(int32 entry, ...) const;
+        void PSendSysMessage(char const* format, ...) const ATTR_PRINTF(2, 3);
 
         void LearnLanguage(uint64 languageId) { m_knownLanguagesMask |= (1llu << languageId); }
         void RemoveLanguage(uint64 languageId) { m_knownLanguagesMask &= ~(1llu << languageId);}
