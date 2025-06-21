@@ -3058,7 +3058,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                 if (m_casterUnit && m_casterUnit != pUnitTarget && std::find(tempTargetUnitMap.begin(), tempTargetUnitMap.end(), m_casterUnit) == tempTargetUnitMap.end())
                     tempTargetUnitMap.push_front(m_casterUnit);
 
-                tempTargetUnitMap.sort(TargetDistanceOrderNear(pUnitTarget));
+                tempTargetUnitMap.sort(ChainHealingOrder(pUnitTarget));
 
                 if (tempTargetUnitMap.empty())
                     break;
@@ -3091,7 +3091,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                     prev = *next;
                     targetUnitMap.push_back(prev);
                     tempTargetUnitMap.erase(next);
-                    tempTargetUnitMap.sort(TargetDistanceOrderNear(prev));
+                    tempTargetUnitMap.sort(ChainHealingOrder(prev));
                     next = tempTargetUnitMap.begin();
 
                     --t;
@@ -4360,7 +4360,7 @@ void Spell::update(uint32 difftime)
                 if (m_caster->IsPlayer() || m_caster->IsPet())
                 {
                     // check for incapacitating player states
-                    if (m_casterUnit->HasUnitState(UNIT_STATE_CAN_NOT_REACT))
+                    if (m_casterUnit->HasUnitState(UNIT_STATE_CAN_NOT_REACT) && !m_spellInfo->IsIgnoringCasterAndTargetRestrictions())
                     {
                         if (m_casterUnit->HasUnitState(UNIT_STATE_FEIGN_DEATH) ||
                            (m_casterUnit->HasUnitState(UNIT_STATE_STUNNED) && !(m_channeled && m_spellInfo->HasAura(SPELL_AURA_MOD_STUN))) ||
@@ -4370,7 +4370,7 @@ void Spell::update(uint32 difftime)
                     }
                 }
 
-                if (m_caster->IsPlayer() && (m_spellInfo->Id != 24322) && (m_spellInfo->Id != 24323))
+                if (m_caster->IsPlayer())
                 {
                     // check if player has jumped before the channeling finished
                     if (((Player*)m_caster)->m_movementInfo.HasMovementFlag(MOVEFLAG_JUMPING))

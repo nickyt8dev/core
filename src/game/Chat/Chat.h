@@ -594,6 +594,7 @@ class ChatHandler
         bool HandleListMoveGensCommand(char* args);
         bool HandleListHostileRefsCommand(char* args);
         bool HandleListThreatCommand(char* args);
+        bool HandleListVisibleGuidsCommand(char* args);
 
         bool HandleLookupAccountEmailCommand(char* args);
         bool HandleLookupAccountIpCommand(char* args);
@@ -844,6 +845,7 @@ class ChatHandler
         bool HandleReloadSpellScriptTargetCommand(char* args);
         bool HandleReloadSpellScriptsCommand(char* args);
         bool HandleReloadSpellTargetPositionCommand(char* args);
+        bool HandleReloadSpellTemplateCommand(char* args);
         bool HandleReloadSpellThreatsCommand(char* args);
         bool HandleReloadSpellPetAurasCommand(char* args);
         bool HandleReloadItemTemplate(char* args);

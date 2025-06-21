@@ -336,7 +336,7 @@ TransportAnimationEntry const* TransportAnimation::GetNextAnimNode(uint32 time) 
     return nullptr;
 }
 
-Transport* TransportMgr::CreateTransport(uint32 entry, Map* map /*= nullptr*/)
+ShipTransport* TransportMgr::CreateTransport(uint32 entry, Map* map /*= nullptr*/)
 {
     // instance case, execute GetGameObjectEntry hook
     if (map && !entry)
@@ -350,7 +350,7 @@ Transport* TransportMgr::CreateTransport(uint32 entry, Map* map /*= nullptr*/)
     }
 
     // create transport...
-    Transport* trans = new Transport(*tInfo);
+    ShipTransport* trans = new ShipTransport(*tInfo);
 
     // ...at first waypoint
     TaxiPathNodeEntry const* startNode = tInfo->keyFrames.begin()->Node;
@@ -382,7 +382,7 @@ Transport* TransportMgr::CreateTransport(uint32 entry, Map* map /*= nullptr*/)
     trans->SetMap(map ? map : sMapMgr.CreateMap(mapId, trans));
 
     // Passengers will be loaded once a player is near
-    trans->GetMap()->Add<Transport>(trans);
+    trans->GetMap()->Add<ShipTransport>(trans);
     return trans;
 }
 
@@ -393,7 +393,7 @@ void TransportMgr::SpawnContinentTransports()
 
     uint32 oldMSTime = WorldTimer::getMSTime();
 
-    std::unique_ptr<QueryResult> result = WorldDatabase.Query("SELECT `entry`, `period` FROM `transports`");
+    std::unique_ptr<QueryResult> result = WorldDatabase.PQuery("SELECT `entry`, `period` FROM `transports` t1 WHERE `build`=(SELECT max(`build`) FROM `transports` t2 WHERE t1.`entry`=t2.`entry` && `build` <= %u)", SUPPORTED_CLIENT_BUILD);
 
     uint32 count = 0;
     if (result)
