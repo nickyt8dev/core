@@ -1,86 +1,69 @@
-# Build and publish the Windows development release on pushes to development.
-name: Windows Development Release
+name: Linux Development Release
 
 on:
   push:
     branches:
       - development
     paths-ignore:
-      - '.github/ISSUE_TEMPLATE.md'
       - '.github/ISSUE_TEMPLATE/**'
+      - '.github/ISSUE_TEMPLATE.md'
       - '.github/PULL_REQUEST_TEMPLATE.md'
-      - '.github/workflows/development-db-dump.yaml'
-      - '.github/workflows/pr-sql-check.yaml'
+      - '.github/workflows/db_check.yml'
+      - '.github/workflows/db_dump.yml'
+      - 'sql/**'
+      - '.drone.yml'
+      - 'README.md'
+      - 'LICENSE'
       - '.gitignore'
       - 'CONTRIBUTING.md'
-      - 'LICENSE'
-      - 'README.md'
-      - 'sql/**'
-
-concurrency:
-  group: windows-development-release-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build Windows development release
-    runs-on: windows-2022
-    permissions:
-      contents: read
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
+    
+    - uses: actions/checkout@v4
 
-      - name: Build release binaries
-        shell: bash # Windows runners default to PowerShell.
-        run: |
-          set -euo pipefail
-          mkdir -p build
-          cd build
-          cmake -DBUILD_EXTRACTORS=1 -G "Visual Studio 17 2022" -A x64 ..
-          "/c/Program Files/Microsoft Visual Studio/2022/Enterprise/MSBuild/Current/Bin/MSBuild.exe" "MaNGOS.sln" //p:Platform=x64 //p:Configuration=Release //m
+    - name: Build
+      run: |
+        sudo apt-get -qq update
+        sudo apt-get -qq install build-essential cmake libmysqlclient-dev 
+        mkdir build
+        cd build
+        sudo cmake ../ -DCMAKE_INSTALL_PREFIX=/azeroth -DDEBUG_SYMBOLS=0 -DSUPPORTED_CLIENT_BUILD=5875 -DBUILD_FOR_HOST_CPU=0
+        sudo make -j $(nproc)
+        sudo make install
+        
+    - name: Collect Files
+      run: |
+        sudo mv /azeroth/etc/realmd.conf.dist /azeroth/etc/realmd.conf
+        sudo mv /azeroth/etc/mangosd.conf.dist /azeroth/etc/mangosd.conf
+    - uses: actions/upload-artifact@v4
+      with:
+        name: my-artifact
+        path: |
+          /azeroth/bin/realmd
+          /azeroth/etc/realmd.conf
+          /azeroth/bin/mangosd
+          /azeroth/etc/mangosd.conf
+        
+    - name: Download Artifact
+      uses: actions/download-artifact@v4
+      with:
+        pattern: my-artifact
+        path: all_snapshots
 
-      - name: Set release archive filename
-        run: |
-          echo "ARCHIVE_FILENAME=dev-$(git rev-parse --short HEAD).zip" >> $env:GITHUB_ENV
+    - name: Get Date
+      id: date
+      uses: Kaven-Universe/github-action-current-date-time@v1
+      with:
+        format: "YYYY-MM-DD"
 
-      - name: Create release archive
-        run: |
-          Set-StrictMode -Version Latest
-          Set-Location "${{ github.workspace }}/bin"
-          Copy-Item -Force "${{ github.workspace }}/dep/windows/lib/x64_release/libmySQL.dll" "${{ github.workspace }}/bin/Release/libmySQL.dll"
-          Copy-Item -Force "${{ github.workspace }}/dep/windows/lib/x64_release/libeay32.dll" "${{ github.workspace }}/bin/Release/libeay32.dll"
-
-          7z a -tzip "${{ env.ARCHIVE_FILENAME }}" Release
-
-      - name: Upload release artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-development-build
-          path: "${{ github.workspace }}/bin/${{ env.ARCHIVE_FILENAME }}"
-
-  publish:
-    name: Publish Windows development release
-    needs: build
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Download release artifact
-        uses: actions/download-artifact@v8
-        with:
-          pattern: windows-development-build
-          merge-multiple: true
-          path: release-assets
-
-      - name: Publish release snapshot
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: ./.github/scripts/publish-moving-release.sh latest "Development Build" release-assets
+    - name: Upload Snapshot
+      uses: "crowbarmaster/GH-Automatic-Releases@latest"
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        automatic_release_tag: "latest"
+        prerelease: true
+        title: "Development Build(${{ steps.date.outputs.time }})"
+        files: all_snapshots
